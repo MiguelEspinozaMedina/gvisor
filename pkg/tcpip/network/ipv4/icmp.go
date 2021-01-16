@@ -15,7 +15,6 @@
 package ipv4
 
 import (
-	"errors"
 	"fmt"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
@@ -106,17 +105,12 @@ func (e *endpoint) handleICMP(pkt *stack.PacketBuffer) {
 		} else {
 			op = &optionUsageReceive{}
 		}
-		aux, tmp, err := e.processIPOptions(pkt, opts, op)
-		if err != nil {
-			switch {
-			case
-				errors.Is(err, header.ErrIPv4OptDuplicate),
-				errors.Is(err, errIPv4RecordRouteOptInvalidLength),
-				errors.Is(err, errIPv4RecordRouteOptInvalidPointer),
-				errors.Is(err, errIPv4TimestampOptInvalidLength),
-				errors.Is(err, errIPv4TimestampOptInvalidPointer),
-				errors.Is(err, errIPv4TimestampOptOverflow):
-				_ = e.protocol.returnError(&icmpReasonParamProblem{pointer: aux}, pkt)
+		tmp, opterr := e.processIPOptions(pkt, opts, op)
+		if opterr != nil {
+			if opterr.NeedICMP {
+				_ = e.protocol.returnError(&icmpReasonParamProblem{
+					pointer: opterr.PPPointer,
+				}, pkt)
 				stats.MalformedRcvdPackets.Increment()
 				stats.IP.MalformedPacketsReceived.Increment()
 			}

@@ -234,7 +234,7 @@ func IPv4RouterAlert() NetworkChecker {
 		for {
 			opt, done, err := iterator.Next()
 			if err != nil {
-				t.Fatalf("error acquiring next IPv4 option %s", err)
+				t.Fatalf("error acquiring next IPv4 option %v", err)
 			}
 			if done {
 				break
