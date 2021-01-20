@@ -36,16 +36,22 @@ import (
 // Sync implements vfs.FilesystemImpl.Sync.
 func (fs *filesystem) Sync(ctx context.Context) error {
 	// Snapshot current syncable dentries and special file FDs.
+	// fs.syncableDentries and fs.specialFileFDs don't hold references on
+	// dentries or special file FDs respectively, and in the former case we
+	// also don't hold fs.renameMu, so we must use TryIncRef to synchronize
+	// with destruction.
 	fs.syncMu.Lock()
 	ds := make([]*dentry, 0, len(fs.syncableDentries))
 	for d := range fs.syncableDentries {
-		d.IncRef()
-		ds = append(ds, d)
+		if d.TryIncRef() {
+			ds = append(ds, d)
+		}
 	}
 	sffds := make([]*specialFileFD, 0, len(fs.specialFileFDs))
 	for sffd := range fs.specialFileFDs {
-		sffd.vfsfd.IncRef()
-		sffds = append(sffds, sffd)
+		if sffd.vfsfd.TryIncRef() {
+			sffds = append(sffds, sffd)
+		}
 	}
 	fs.syncMu.Unlock()
 
